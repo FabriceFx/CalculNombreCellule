@@ -1,0 +1,300 @@
+<script>
+  // 2. Dictionnaire de traductions bilingue complet
+  const TRANSLATIONS = {
+    fr: {
+      sidebarTitle: "Utilisation des cellules",
+      btnAnalyze: "Analyser les feuilles",
+      btnClean: "Nettoyer les cellules vides",
+      totalUsed: "Total utilisé :",
+      googleLimit: "Limite Google :",
+      status: "Statut :",
+      details: "Détails par feuille",
+      ready: "Prêt.",
+      analyzing: "Analyse en cours...",
+      analysisComplete: "Analyse terminée.",
+      cleaning: "Nettoyage en cours...",
+      cleanComplete: "Nettoyage terminé.",
+      confirmClean: "Voulez-vous vraiment supprimer toutes les colonnes et lignes vides superflues de toutes les feuilles ? Cette opération peut modifier la mise en forme de vos documents.",
+      usedChart: "Utilisé",
+      freeChart: "Libre",
+      statusOk: "OK",
+      statusWarning: "ATTENTION",
+      statusCritical: "CRITIQUE",
+      modalTitle: "Attention",
+      btnCancel: "Annuler",
+      btnConfirm: "Confirmer",
+      resultTitle: "Résultat du nettoyage",
+      btnCloseResult: "Compris, rafraîchir l'analyse",
+      allocated: "allouées",
+      filled: "remplies",
+      msgDeletedOk: "✅ %num% cellules vides ont été supprimées avec succès !\n\n",
+      msgDeletedNone: "ℹ️ Aucune cellule supprimée. Google considère que vos données vont déjà jusqu'au bord de la grille.\n\n",
+      msgDetected: "Ce que le script a détecté :\n",
+      msgErrors: "⚠️ Erreurs rencontrées (ex: cellules fusionnées empêchant la suppression) :\n",
+      errorMsg: "❌ Erreur",
+      aboutDev: "Développé par",
+      footerHelp: "Aide"
+    },
+    en: {
+      sidebarTitle: "Cell Usage",
+      btnAnalyze: "Analyze Sheets",
+      btnClean: "Clean Empty Cells",
+      totalUsed: "Total Used:",
+      googleLimit: "Google Limit:",
+      status: "Status:",
+      details: "Details per Sheet",
+      ready: "Ready.",
+      analyzing: "Analyzing...",
+      analysisComplete: "Analysis complete.",
+      cleaning: "Cleaning in progress...",
+      cleanComplete: "Cleaning complete.",
+      confirmClean: "Are you sure you want to delete all unnecessary empty columns and rows from all sheets? This might affect your document formatting.",
+      usedChart: "Used",
+      freeChart: "Free",
+      statusOk: "OK",
+      statusWarning: "WARNING",
+      statusCritical: "CRITICAL",
+      modalTitle: "Warning",
+      btnCancel: "Cancel",
+      btnConfirm: "Confirm",
+      resultTitle: "Cleaning Result",
+      btnCloseResult: "Got it, refresh analysis",
+      allocated: "allocated",
+      filled: "filled",
+      msgDeletedOk: "✅ %num% empty cells were successfully deleted!\n\n",
+      msgDeletedNone: "ℹ️ No cells deleted. Google considers your data to already reach the edge of the grid.\n\n",
+      msgDetected: "What the script detected:\n",
+      msgErrors: "⚠️ Errors encountered (e.g. merged cells preventing deletion):\n",
+      errorMsg: "❌ Error",
+      aboutDev: "Developed by",
+      footerHelp: "Help"
+    }
+  };
+
+  function getTxt(key) {
+    return TRANSLATIONS[USER_LOCALE][key] || TRANSLATIONS['en'][key] || key;
+  }
+
+  const MAX_CELLS = 10000000;
+  let chartInstance = null;
+
+  // Initialisation UI
+  window.onload = function() {
+    document.getElementById('txtBtnAnalyze').innerText = getTxt('btnAnalyze');
+    document.getElementById('txtBtnClean').innerText = getTxt('btnClean');
+    document.getElementById('ui_total_used').innerText = getTxt('totalUsed');
+    document.getElementById('ui_limit').innerText = getTxt('googleLimit');
+    document.getElementById('ui_status').innerText = getTxt('status');
+    document.getElementById('ui_details').innerText = getTxt('details');
+    document.getElementById('statusText').innerText = getTxt('ready');
+    
+    document.getElementById('ui_modal_title').innerText = getTxt('modalTitle');
+    document.getElementById('ui_btn_cancel').innerText = getTxt('btnCancel');
+    document.getElementById('ui_btn_confirm').innerText = getTxt('btnConfirm');
+    document.getElementById('ui_result_title').innerText = getTxt('resultTitle');
+    document.getElementById('ui_btn_close_result').innerText = getTxt('btnCloseResult');
+    document.getElementById('txt-footerHelp').innerText = getTxt('footerHelp');
+    
+    initChart(0, MAX_CELLS);
+  };
+
+  function showLoading(show) {
+    const overlay = document.getElementById("loadingOverlay");
+    if (overlay) {
+      if (show) overlay.classList.add("show");
+      else overlay.classList.remove("show");
+    }
+  }
+
+  function showToast(message, type = 'success') {
+    const toast = document.getElementById('toastNotification');
+    toast.textContent = message;
+    toast.className = 'toast show ' + type;
+    setTimeout(() => {
+      toast.classList.remove('show');
+    }, 4000);
+  }
+
+  function initChart(used, remaining) {
+    const ctx = document.getElementById('usageChart').getContext('2d');
+    if (chartInstance) {
+      chartInstance.destroy();
+    }
+    
+    let color = '#146c2e'; // Green
+    const percentage = used / MAX_CELLS;
+    if (percentage > 0.95) color = '#b3261e'; // Red
+    else if (percentage > 0.80) color = '#fbbc04'; // Yellow
+
+    chartInstance = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: [getTxt('usedChart'), getTxt('freeChart')],
+        datasets: [{
+          data: [used, remaining],
+          backgroundColor: [color, '#e3e3e3'],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        cutout: '75%',
+        responsive: true,
+        plugins: { legend: { display: false } }
+      }
+    });
+  }
+
+  function updateBadge(used) {
+    const badge = document.getElementById('statusBadge');
+    const percentage = used / MAX_CELLS;
+    
+    if (percentage > 0.95) {
+      badge.className = 'badge red';
+      badge.innerText = getTxt('statusCritical');
+    } else if (percentage > 0.80) {
+      badge.className = 'badge yellow';
+      badge.innerText = getTxt('statusWarning');
+    } else {
+      badge.className = 'badge green';
+      badge.innerText = getTxt('statusOk');
+    }
+  }
+
+  function setStatus(msg) {
+    document.getElementById('statusText').innerText = msg;
+  }
+
+  function handleError(error) {
+    showLoading(false);
+    setStatus(getTxt('errorMsg') + ': ' + error.message);
+    showToast(getTxt('errorMsg') + ': ' + error.message, 'error');
+    document.getElementById('btnAnalyze').disabled = false;
+    document.getElementById('btnClean').disabled = false;
+  }
+
+  function startAnalysis() {
+    document.getElementById('btnAnalyze').disabled = true;
+    document.getElementById('btnClean').disabled = true;
+    document.getElementById('progressBarContainer').style.display = 'block';
+    document.getElementById('progressBar').style.width = '0%';
+    document.getElementById('detailsCard').style.display = 'none';
+    document.getElementById('sheetsList').innerHTML = '';
+    
+    setStatus(getTxt('analyzing'));
+    showLoading(true);
+    
+    google.script.run
+      .withSuccessHandler(processSheetsData)
+      .withFailureHandler(handleError)
+      .getSheetNames();
+  }
+
+  function processSheetsData(sheets) {
+    let totalGridCells = 0;
+    let currentIndex = 0;
+    const results = [];
+
+    function analyzeNext() {
+      if (currentIndex >= sheets.length) {
+        finishAnalysis(results, totalGridCells);
+        return;
+      }
+
+      const sheetName = sheets[currentIndex];
+      setStatus(`${getTxt('analyzing')} ${currentIndex + 1}/${sheets.length}: ${sheetName}`);
+      
+      const progress = ((currentIndex) / sheets.length) * 100;
+      document.getElementById('progressBar').style.width = `${progress}%`;
+
+      google.script.run
+        .withSuccessHandler(function(stats) {
+          totalGridCells += stats.gridCells;
+          results.push({ name: sheetName, cells: stats.gridCells, nonEmpty: stats.nonEmptyCells });
+          currentIndex++;
+          analyzeNext();
+        })
+        .withFailureHandler(handleError)
+        .analyzeSingleSheet(sheetName);
+    }
+
+    analyzeNext();
+  }
+
+  function finishAnalysis(results, totalGridCells) {
+    document.getElementById('progressBar').style.width = '100%';
+    setTimeout(() => { document.getElementById('progressBarContainer').style.display = 'none'; }, 500);
+    
+    showLoading(false);
+    document.getElementById('btnAnalyze').disabled = false;
+    document.getElementById('btnClean').style.display = 'block';
+    document.getElementById('btnClean').disabled = false;
+    
+    setStatus(getTxt('analysisComplete'));
+    document.getElementById('totalUsedVal').innerText = totalGridCells.toLocaleString();
+    
+    initChart(totalGridCells, Math.max(0, MAX_CELLS - totalGridCells));
+    updateBadge(totalGridCells);
+
+    results.sort((a, b) => b.cells - a.cells);
+    const list = document.getElementById('sheetsList');
+    results.forEach(res => {
+      const li = document.createElement('li');
+      li.innerHTML = `<span>${res.name}</span> <span style="text-align:right"><strong>${res.cells.toLocaleString()}</strong> ${getTxt('allocated')}<br><small style="color:var(--text-muted)">${res.nonEmpty.toLocaleString()} ${getTxt('filled')}</small></span>`;
+      list.appendChild(li);
+    });
+    document.getElementById('detailsCard').style.display = 'block';
+  }
+
+  function startCleaning() {
+    document.getElementById('confirmMsg').innerText = getTxt('confirmClean');
+    document.getElementById('confirmModal').style.display = 'flex';
+  }
+  
+  function closeConfirmModal() {
+    document.getElementById('confirmModal').style.display = 'none';
+  }
+
+  function executeCleaning() {
+    closeConfirmModal();
+    document.getElementById('btnAnalyze').disabled = true;
+    document.getElementById('btnClean').disabled = true;
+    document.getElementById('progressBarContainer').style.display = 'block';
+    document.getElementById('progressBar').style.width = '0%';
+    
+    setStatus(getTxt('cleaning'));
+    showLoading(true);
+    
+    google.script.run
+      .withSuccessHandler(function(result) {
+        document.getElementById('progressBar').style.width = '100%';
+        setTimeout(() => { document.getElementById('progressBarContainer').style.display = 'none'; }, 500);
+        showLoading(false);
+        
+        let msg = "";
+        
+        if (result && result.deleted > 0) {
+          msg += getTxt('msgDeletedOk').replace('%num%', result.deleted.toLocaleString());
+        } else {
+          msg += getTxt('msgDeletedNone');
+        }
+        
+        if (result && result.details && result.details.length > 0) {
+          msg += getTxt('msgDetected') + result.details.join("\n") + "\n\n";
+        }
+        
+        if (result && result.errors && result.errors.length > 0) {
+          msg += getTxt('msgErrors') + result.errors.join("\n");
+        }
+        
+        document.getElementById('cleanResultText').innerText = msg;
+        document.getElementById('resultCard').style.display = 'block';
+      })
+      .withFailureHandler(handleError)
+      .cleanAllSheets();
+  }
+  
+  function closeResultCard() {
+    document.getElementById('resultCard').style.display = 'none';
+    startAnalysis();
+  }
+</script>
